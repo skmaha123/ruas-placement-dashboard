@@ -1,7 +1,11 @@
+import git
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import time
+import streamlit.components.v1 as components
+from numpy import add
+from websockets.version import commit
 
 # -------------------------------------------------
 # PAGE CONFIG
@@ -406,4 +410,44 @@ st.download_button(
     data=csv,
     file_name="RUAS_Placement_Report.csv",
     mime="text/csv"
+)
+st.markdown("<br>" * 100, unsafe_allow_html=True)
+# -------------------------------------------------
+# AUTO SCROLL TOP ↔ BOTTOM
+# -------------------------------------------------
+
+components.html(
+    """
+    <script>
+    let direction = 1;
+
+    setInterval(function () {
+
+        const doc = window.parent.document.documentElement;
+
+        const currentPos =
+            window.parent.pageYOffset ||
+            doc.scrollTop;
+
+        const maxScroll =
+            doc.scrollHeight -
+            window.parent.innerHeight;
+
+        if (currentPos >= maxScroll - 5) {
+            direction = -1;   // start moving up
+        }
+
+        if (currentPos <= 5) {
+            direction = 1;    // start moving down
+        }
+
+        window.parent.scrollBy(
+            0,
+            4 * direction
+        );
+
+    }, 30);
+    </script>
+    """,
+    height=0
 )
