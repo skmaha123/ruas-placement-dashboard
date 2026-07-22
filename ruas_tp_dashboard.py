@@ -451,3 +451,31 @@ components.html(
     """,
     height=0
 )
+
+st.markdown("""
+<script>
+function autoScroll() {
+    let scrollStep = 2;      // pixels per step
+    let delay = 50;          // milliseconds
+    let direction = 1;       // 1=down, -1=up
+
+    setInterval(function() {
+        let maxScroll =
+            document.documentElement.scrollHeight -
+            window.innerHeight;
+
+        window.scrollBy(0, scrollStep * direction);
+
+        if (window.scrollY >= maxScroll) {
+            direction = -1;  // scroll up
+        }
+
+        if (window.scrollY <= 0) {
+            direction = 1;   // scroll down again
+        }
+    }, delay);
+}
+
+window.addEventListener('load', autoScroll);
+</script>
+""", unsafe_allow_html=True)
