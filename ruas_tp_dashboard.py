@@ -1,11 +1,9 @@
-import git
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from streamlit_autorefresh import st_autorefresh
 import time
-import streamlit.components.v1 as components
-from numpy import add
-from websockets.version import commit
 
 # -------------------------------------------------
 # PAGE CONFIG
@@ -16,6 +14,17 @@ st.set_page_config(
     page_icon="🎓",
     layout="wide"
 )
+# -------------------------------------------------
+# AUTO ROTATION
+# -------------------------------------------------
+
+rotation = st_autorefresh(
+    interval=15000,  # 15 seconds
+    key="tv_rotation"
+)
+
+page = rotation % 4
+
 
 # -------------------------------------------------
 # RUAS THEME
@@ -35,7 +44,15 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+st.markdown("""
+<style>
 
+header {
+    visibility:hidden;
+}
+
+</style>
+""", unsafe_allow_html=True)
 # -------------------------------------------------
 # HEADER
 # -------------------------------------------------
@@ -232,250 +249,128 @@ faculty_filter = st.sidebar.multiselect(
 filtered_df = df[
     df["Faculty"].isin(faculty_filter)
 ]
-
-# -------------------------------------------------
-# CHARTS ROW 1
-# -------------------------------------------------
-
-col1,col2 = st.columns(2)
-
-with col1:
-
-    fig1 = px.bar(
-        filtered_df,
-        x="Program",
-        y="Offers",
-        color="Faculty",
-        title="Offers by Program"
-    )
-
-    st.plotly_chart(
-        fig1,
-        use_container_width=True
-    )
-
-with col2:
-
-    fig2 = px.pie(
-        filtered_df,
-        names="Faculty",
-        values="Offers",
-        hole=0.5,
-        title="Faculty Contribution"
-    )
-
-    st.plotly_chart(
-        fig2,
-        use_container_width=True
-    )
-
-# -------------------------------------------------
-# CHARTS ROW 2
-# -------------------------------------------------
-
-col3,col4 = st.columns(2)
-
-with col3:
-
-    fig3 = px.bar(
-        filtered_df,
-        x="Program",
-        y="AverageSalary",
-        color="Faculty",
-        title="Average Salary"
-    )
-
-    st.plotly_chart(
-        fig3,
-        use_container_width=True
-    )
-
-with col4:
-
-    fig4 = px.bar(
-        filtered_df,
-        x="Program",
-        y="HighestSalary",
-        color="Faculty",
-        title="Highest Salary"
-    )
-
-    st.plotly_chart(
-        fig4,
-        use_container_width=True
-    )
-
-# -------------------------------------------------
-# FACULTY SUMMARY
-# -------------------------------------------------
-
-st.subheader("Faculty-Wise Placement Summary")
-
 faculty_summary = (
     filtered_df
     .groupby("Faculty")
     .agg({
-        "BatchStrength":"sum",
-        "EligibleStudents":"sum",
-        "Offers":"sum",
-        "Companies":"sum"
+        "BatchStrength": "sum",
+        "EligibleStudents": "sum",
+        "Offers": "sum",
+        "Companies": "sum"
     })
     .reset_index()
 )
 
 faculty_summary["PlacementPercent"] = round(
-    faculty_summary["Offers"] /
-    faculty_summary["EligibleStudents"] * 100,
+    faculty_summary["Offers"]
+    / faculty_summary["EligibleStudents"] * 100,
     2
 )
 
-st.dataframe(
-    faculty_summary,
-    use_container_width=True
-)
+# -----------------------------------------------
+# AUTO ROTATION
+# -----------------------------------------------
+
+# refresh data every 5 minutes
 
 # -------------------------------------------------
-# PROGRAM SUMMARY
+# FACULTY SUMMARY
 # -------------------------------------------------
 
-st.subheader("Program-Wise Statistics")
+st.divider()
 
-st.dataframe(
-    filtered_df,
-    use_container_width=True
-)
+# ==================================================
+# TV MODE AUTO ROTATING SCREENS
+# ==================================================
 
-# -------------------------------------------------
-# LIVE ENTRY FORM
-# -------------------------------------------------
+if page == 0:
 
-st.subheader("➕ Add New Placement Data")
+    st.header("📊 Placement Overview")
 
-with st.form("new_record"):
+    col1, col2 = st.columns(2)
 
-    faculty = st.text_input("Faculty")
+    with col1:
 
-    department = st.text_input("Department")
-
-    program = st.text_input("Program")
-
-    offers = st.number_input(
-        "Offers",
-        min_value=0
-    )
-
-    company = st.number_input(
-        "Companies",
-        min_value=0
-    )
-
-    highest = st.number_input(
-        "Highest Salary",
-        min_value=0.0
-    )
-
-    submit = st.form_submit_button(
-        "Submit"
-    )
-
-    if submit:
-
-        st.balloons()
-
-        st.success(
-            f"""
-🎉 Congratulations!
-
-{program}
-
-has reported
-
-{offers} new offers
-
-Highest Package:
-₹ {highest} LPA
-"""
+        fig1 = px.bar(
+            filtered_df,
+            x="Program",
+            y="Offers",
+            color="Faculty",
+            title="Offers by Program"
         )
 
-# -------------------------------------------------
-# DOWNLOAD FILTERED DATA
-# -------------------------------------------------
+        st.plotly_chart(
+            fig1,
+            use_container_width=True
+        )
 
-csv = filtered_df.to_csv(
-    index=False
-)
+    with col2:
 
-st.download_button(
-    label="Download Current Data",
-    data=csv,
-    file_name="RUAS_Placement_Report.csv",
-    mime="text/csv"
-)
-st.markdown("<br>" * 100, unsafe_allow_html=True)
-# -------------------------------------------------
-# AUTO SCROLL TOP ↔ BOTTOM
-# -------------------------------------------------
+        fig2 = px.pie(
+            filtered_df,
+            values="Offers",
+            names="Faculty",
+            hole=0.5,
+            title="Faculty Contribution"
+        )
 
-components.html(
-    """
-    <script>
-    let direction = 1;
+        st.plotly_chart(
+            fig2,
+            use_container_width=True
+        )
 
-    setInterval(function () {
+elif page == 1:
 
-        const doc = window.parent.document.documentElement;
+    st.header("💰 Salary Analysis")
 
-        const currentPos =
-            window.parent.pageYOffset ||
-            doc.scrollTop;
+    col1, col2 = st.columns(2)
 
-        const maxScroll =
-            doc.scrollHeight -
-            window.parent.innerHeight;
+    with col1:
 
-        if (currentPos >= maxScroll - 5) {
-            direction = -1;   // start moving up
-        }
+        fig3 = px.bar(
+            filtered_df,
+            x="Program",
+            y="AverageSalary",
+            color="Faculty",
+            title="Average Salary (LPA)"
+        )
 
-        if (currentPos <= 5) {
-            direction = 1;    // start moving down
-        }
+        st.plotly_chart(
+            fig3,
+            use_container_width=True
+        )
 
-        window.parent.scrollBy(
-            0,
-            4 * direction
-        );
+    with col2:
 
-    }, 30);
-    </script>
-    """,
-    height=0
-)
+        fig4 = px.bar(
+            filtered_df,
+            x="Program",
+            y="HighestSalary",
+            color="Faculty",
+            title="Highest Salary (LPA)"
+        )
 
-st.markdown("""
-<script>
-function autoScroll() {
-    let scrollStep = 2;      // pixels per step
-    let delay = 50;          // milliseconds
-    let direction = 1;       // 1=down, -1=up
+        st.plotly_chart(
+            fig4,
+            use_container_width=True
+        )
 
-    setInterval(function() {
-        let maxScroll =
-            document.documentElement.scrollHeight -
-            window.innerHeight;
+elif page == 2:
 
-        window.scrollBy(0, scrollStep * direction);
+    st.header("🏢 Faculty-Wise Placement Summary")
 
-        if (window.scrollY >= maxScroll) {
-            direction = -1;  // scroll up
-        }
+    st.dataframe(
+        faculty_summary,
+        use_container_width=True,
+        height=600
+    )
 
-        if (window.scrollY <= 0) {
-            direction = 1;   // scroll down again
-        }
-    }, delay);
-}
+elif page == 3:
 
-window.addEventListener('load', autoScroll);
-</script>
-""", unsafe_allow_html=True)
+    st.header("🎓 Program-Wise Statistics")
+
+    st.dataframe(
+        filtered_df,
+        use_container_width=True,
+        height=600
+    )
