@@ -202,7 +202,7 @@ c5.metric(
 )
 
 c6.metric(
-    "💰 Avg Salary",
+    "₹ Avg Salary",
     f"{average_salary} LPA"
 )
 
