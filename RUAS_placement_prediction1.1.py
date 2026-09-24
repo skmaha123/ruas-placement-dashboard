@@ -44,7 +44,7 @@ h1,h2,h3{
 # TITLE
 # --------------------------------------------------
 
-st.title("🎓 MSRUAS Placement Intelligence Dashboard")
+st.title("MSRUAS Placement Intelligence Dashboard")
 
 st.markdown(
 """
@@ -239,7 +239,7 @@ if uploaded_file:
     # FORECAST MODEL
     # --------------------------------------------------
 
-    st.header("🔮 Placement Forecast")
+    st.header("Placement Forecast")
 
     encoded = df.copy()
 
