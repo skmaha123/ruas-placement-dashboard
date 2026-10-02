@@ -1,0 +1,617 @@
+# =====================================================
+# RTC PLACEMENT INTELLIGENCE DASHBOARD
+# =====================================================
+
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import  numpy as np
+from sklearn.linear_model import LinearRegression
+
+st.set_page_config(
+    page_title="RTC Placement Intelligence Dashboard",
+    page_icon="🚀",
+    layout="wide"
+)
+
+# =====================================================
+# HEADER
+# =====================================================
+
+st.title("🚀 RTC Placement Intelligence Dashboard")
+st.subheader("AI Driven Placement Analytics & Forecasting")
+
+# =====================================================
+# FILE UPLOAD
+# =====================================================
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Placement Excel",
+    type=["xlsx"]
+)
+
+if uploaded_file is None:
+    st.info("Please upload your placement Excel file.")
+    st.stop()
+
+# =====================================================
+# READ DATA
+# =====================================================
+
+df = pd.read_excel(uploaded_file)
+
+df.columns = [c.strip() for c in df.columns]
+
+required_cols = [
+    "Year",
+    "Course",
+    "Branch",
+    "Graduated",
+    "No. of offers",
+    "Higher studies/Entrepreneurship",
+    "Entrepreneurship",
+    "competitive exams",
+    "Placement %"
+]
+
+missing = [c for c in required_cols if c not in df.columns]
+
+if missing:
+    st.error(f"Missing columns: {missing}")
+    st.stop()
+
+# =====================================================
+# CLEAN DATA
+# =====================================================
+
+numeric_cols = [
+    "Graduated",
+    "No. of offers",
+    "Higher studies/Entrepreneurship",
+    "Entrepreneurship",
+    "competitive exams",
+    "Placement %"
+]
+
+for col in numeric_cols:
+    df[col] = pd.to_numeric(
+        df[col],
+        errors="coerce"
+    ).fillna(0)
+
+df["Placement %"] = df["Placement %"] * 100
+
+# =====================================================
+# FILTERS
+# =====================================================
+
+st.sidebar.header("Filters")
+
+years = sorted(df["Year"].unique())
+courses = sorted(df["Course"].unique())
+branches = sorted(df["Branch"].unique())
+
+selected_year = st.sidebar.multiselect(
+    "Select Year",
+    years,
+    default=years
+)
+
+selected_course = st.sidebar.multiselect(
+    "Select Course",
+    courses,
+    default=courses
+)
+
+selected_branch = st.sidebar.multiselect(
+    "Select Branch",
+    branches,
+    default=branches
+)
+
+filtered = df[
+    (df["Year"].isin(selected_year))
+    &
+    (df["Course"].isin(selected_course))
+    &
+    (df["Branch"].isin(selected_branch))
+]
+
+if filtered.empty:
+    st.warning("No data available.")
+    st.stop()
+
+# =====================================================
+# KPI SECTION
+# =====================================================
+
+graduates = filtered["Graduated"].sum()
+offers = filtered["No. of offers"].sum()
+higher = filtered["Higher studies/Entrepreneurship"].sum()
+entre = filtered["Entrepreneurship"].sum()
+exams = filtered["competitive exams"].sum()
+
+placement_rate = round(
+    filtered["Placement %"].mean(),
+    2
+)
+
+c1, c2, c3, c4, c5, c6 = st.columns(6)
+
+c1.metric("Graduates", f"{graduates:,.0f}")
+c2.metric("Offers", f"{offers:,.0f}")
+c3.metric("Placement %", f"{placement_rate:.2f}%")
+c4.metric("Higher Studies", f"{higher:,.0f}")
+c5.metric("Entrepreneurship", f"{entre:,.0f}")
+c6.metric("Competitive Exams", f"{exams:,.0f}")
+
+st.divider()
+
+# =====================================================
+# YEAR TREND
+# =====================================================
+
+st.subheader("📈 Year Wise Placement Trend")
+
+yearly = filtered.groupby("Year").agg({
+    "Graduated":"sum",
+    "No. of offers":"sum",
+    "Placement %":"mean"
+}).reset_index()
+
+fig = make_subplots(
+    specs=[[{"secondary_y":True}]]
+)
+
+fig.add_trace(
+    go.Bar(
+        x=yearly["Year"],
+        y=yearly["Graduated"],
+        name="Graduated"
+    ),
+    secondary_y=False
+)
+
+fig.add_trace(
+    go.Bar(
+        x=yearly["Year"],
+        y=yearly["No. of offers"],
+        name="Offers"
+    ),
+    secondary_y=False
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=yearly["Year"],
+        y=yearly["Placement %"],
+        mode="lines+markers",
+        line=dict(color="red", width=4),
+        name="Placement %"
+    ),
+    secondary_y=True
+)
+
+fig.update_layout(
+    height=550,
+    template="plotly_white"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+# =====================================================
+# BRANCH RANKING
+# =====================================================
+
+st.subheader("🏆 Branch Ranking")
+
+ranking = filtered.groupby("Branch").agg({
+    "Placement %":"mean",
+    "No. of offers":"sum",
+    "Higher studies/Entrepreneurship":"sum",
+    "Entrepreneurship":"sum"
+}).reset_index()
+
+ranking["Score"] = (
+      ranking["Placement %"] * 0.6
+    + ranking["No. of offers"] * 0.2
+    + ranking["Higher studies/Entrepreneurship"] * 0.1
+    + ranking["Entrepreneurship"] * 0.1
+)
+
+ranking = ranking.sort_values(
+    "Score",
+    ascending=False
+)
+
+fig_rank = px.bar(
+    ranking,
+    x="Score",
+    y="Branch",
+    orientation="h",
+    color="Placement %",
+    title="Branch Intelligence Ranking"
+)
+
+st.plotly_chart(
+    fig_rank,
+    use_container_width=True
+)
+
+# =====================================================
+# HEATMAP
+# =====================================================
+
+st.subheader("🔥 Placement Heatmap")
+
+heat = filtered.pivot_table(
+    index="Branch",
+    columns="Year",
+    values="Placement %",
+    aggfunc="mean"
+)
+
+fig_heat = px.imshow(
+    heat,
+    text_auto=True,
+    aspect="auto",
+    color_continuous_scale="Viridis"
+)
+
+fig_heat.update_layout(
+    height=650
+)
+
+st.plotly_chart(
+    fig_heat,
+    use_container_width=True
+)
+# =====================================================
+# AI FORECASTING DASHBOARD (2027-2029)
+# =====================================================
+
+st.divider()
+st.header("🤖 AI Forecasting & Placement Intelligence")
+
+# =====================================================
+# OVERALL FORECAST
+# =====================================================
+
+forecast_base = (
+    filtered.groupby("Year")
+    .agg({
+        "Graduated": "sum",
+        "No. of offers": "sum",
+        "Placement %": "mean"
+    })
+    .reset_index()
+)
+
+future_years = pd.DataFrame({
+    "Year": [2027, 2028, 2029]
+})
+
+X = forecast_base[["Year"]]
+
+# -----------------------------------------------------
+# Graduates Forecast
+# -----------------------------------------------------
+
+grad_model = LinearRegression()
+grad_model.fit(X, forecast_base["Graduated"])
+
+future_years["Forecast Graduates"] = (
+    grad_model.predict(future_years[["Year"]])
+).round().astype(int)
+
+# -----------------------------------------------------
+# Offers Forecast
+# -----------------------------------------------------
+
+offer_model = LinearRegression()
+offer_model.fit(X, forecast_base["No. of offers"])
+
+future_years["Forecast Offers"] = (
+    offer_model.predict(future_years[["Year"]])
+).round().astype(int)
+
+# -----------------------------------------------------
+# Placement % Forecast
+# -----------------------------------------------------
+
+place_model = LinearRegression()
+place_model.fit(X, forecast_base["Placement %"])
+
+future_years["Forecast Placement %"] = (
+    place_model.predict(future_years[["Year"]])
+)
+
+future_years["Forecast Placement %"] = (
+    future_years["Forecast Placement %"]
+    .clip(0, 100)
+    .round(2)
+)
+
+# =====================================================
+# FORECAST TABLE
+# =====================================================
+
+st.subheader("📊 2027-2029 Forecast")
+
+st.dataframe(
+    future_years,
+    use_container_width=True
+)
+
+# =====================================================
+# FORECAST GRAPH
+# =====================================================
+
+actual_plot = forecast_base.copy()
+actual_plot["Type"] = "Actual"
+
+forecast_plot = future_years.rename(
+    columns={
+        "Forecast Graduates": "Graduated",
+        "Forecast Offers": "No. of offers",
+        "Forecast Placement %": "Placement %"
+    }
+)
+
+forecast_plot["Type"] = "Forecast"
+
+fig = go.Figure()
+
+fig.add_trace(
+    go.Scatter(
+        x=actual_plot["Year"],
+        y=actual_plot["Placement %"],
+        mode="lines+markers",
+        name="Actual",
+        line=dict(
+            color="green",
+            width=4
+        )
+    )
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=forecast_plot["Year"],
+        y=forecast_plot["Placement %"],
+        mode="lines+markers",
+        name="Forecast",
+        line=dict(
+            color="red",
+            width=4,
+            dash="dash"
+        )
+    )
+)
+
+fig.update_layout(
+    title="Placement Percentage Forecast",
+    template="plotly_white",
+    height=500
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+# =====================================================
+# BRANCH FORECAST
+# =====================================================
+
+st.subheader("🎯 Branch-wise Forecast to 2029")
+
+branch_predictions = []
+
+for branch in sorted(filtered["Branch"].unique()):
+
+    temp = (
+        filtered[
+            filtered["Branch"] == branch
+        ]
+        .groupby("Year")
+        ["Placement %"]
+        .mean()
+        .reset_index()
+    )
+
+    if len(temp) < 2:
+        continue
+
+    X_branch = temp[["Year"]]
+    y_branch = temp["Placement %"]
+
+    model = LinearRegression()
+    model.fit(
+        X_branch,
+        y_branch
+    )
+
+    for yr in [2027, 2028, 2029]:
+
+        pred = model.predict(
+            pd.DataFrame({"Year": [yr]})
+        )[0]
+
+        pred = max(
+            min(pred, 100),
+            0
+        )
+
+        branch_predictions.append([
+            branch,
+            yr,
+            round(pred, 2)
+        ])
+
+branch_forecast = pd.DataFrame(
+    branch_predictions,
+    columns=[
+        "Branch",
+        "Year",
+        "Forecast Placement %"
+    ]
+)
+
+st.dataframe(
+    branch_forecast,
+    use_container_width=True
+)
+
+fig = px.line(
+    branch_forecast,
+    x="Year",
+    y="Forecast Placement %",
+    color="Branch",
+    markers=True,
+    title="Branch Forecast (2027-2029)"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+# =====================================================
+# RISK ANALYSIS
+# =====================================================
+
+st.subheader("🚨 Risk Analysis")
+
+risk_df = (
+    filtered.groupby("Branch")
+    ["Placement %"]
+    .mean()
+    .reset_index()
+)
+
+risk_df["Risk"] = np.select(
+    [
+        risk_df["Placement %"] >= 80,
+        risk_df["Placement %"] >= 60
+    ],
+    [
+        "Low Risk",
+        "Moderate Risk"
+    ],
+    default="High Risk"
+)
+
+fig = px.scatter(
+    risk_df,
+    x="Placement %",
+    y="Branch",
+    size="Placement %",
+    color="Risk",
+    hover_name="Branch",
+    title="Placement Risk Matrix"
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+# =====================================================
+# TOP & BOTTOM BRANCHES
+# =====================================================
+
+top_branch = (
+    risk_df.sort_values(
+        "Placement %",
+        ascending=False
+    )
+    .iloc[0]
+)
+
+bottom_branch = (
+    risk_df.sort_values(
+        "Placement %",
+        ascending=True
+    )
+    .iloc[0]
+)
+
+c1, c2 = st.columns(2)
+
+with c1:
+    st.success(
+        f"""
+🏆 Best Branch
+
+{top_branch['Branch']}
+
+Placement {top_branch['Placement %']:.2f}%
+"""
+    )
+
+with c2:
+    st.error(
+        f"""
+⚠ Needs Attention
+
+{bottom_branch['Branch']}
+
+Placement: {bottom_branch['Placement %']:.2f}%
+"""
+    )
+
+# =====================================================
+# EXECUTIVE AI INSIGHTS
+# =====================================================
+
+st.subheader("🧠 AI Executive Insights")
+
+forecast_2029 = future_years[
+    future_years["Year"] == 2029
+]["Forecast Placement %"].iloc[0]
+
+st.info(
+f"""
+✅ Total Graduates Analysed : {graduates:,.0f}
+
+✅ Total Offers : {offers:,.0f}
+
+✅ Average Placement : {placement_rate:.2f}%
+
+✅ Best Performing Branch : {top_branch['Branch']}
+
+✅ Highest Placement : {top_branch['Placement %']:.2f}%
+
+⚠ Intervention Required : {bottom_branch['Branch']}
+
+📈 Projected Overall Placement in 2029 :
+{forecast_2029:.2f}%
+
+🎯 Recommendation:
+Increase recruiter engagement,
+industry collaboration,
+internships,
+CRT training,
+higher-studies mentoring,
+and alumni referral hiring.
+"""
+)
+
+# =====================================================
+# DOWNLOAD FORECAST
+# =====================================================
+
+csv = future_years.to_csv(index=False)
+
+st.download_button(
+    label="📥 Download Forecast CSV",
+    data=csv,
+    file_name="Placement_Forecast_2027_2029.csv",
+    mime="text/csv"
+)
